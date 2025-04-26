@@ -1,9 +1,18 @@
-## 🤔 What is it?
+## Overview
+This is an ETL data pipeline that extracts job market data from two Algerian job platforms [Emploitic](emploitic.com) and [EmploiPartner](emploipartner.com) via API calls and transforms it to populate a dimensional model using a star schema, feeding a Metabase dashboad that contains various metrics and charts that track Algerian job market supply and demand.
 
-This is a Docker Compose template for getting started with a new Mage project.
+## Architecture
+The pipeline follows a medallion architecture with 3 layers:
+- **Bronze layer**: raw and staging data.
+- **Silver layer**: fact and dimension tables.
+- **Gold layer**: marts and pre-aggregated data.
 
-## 🙋‍♂️ Why did you create it?
+## Challenges
+- Modeling many-to-many relashionships using bridge tables.
+- Handling a string encoding issue (`é` -> `u00e9`, `ï` -> `u00ef`) caused by Mage when loading text[] columns into Postgres. which teached me about the `unistr` function in Postgres.
+- Standardization of same columns coming from the two sources in different formats and languages.
 
-We created this template for users to have an easy way to deploy a project using Docker.
-
-Using Docker Compose allows editors to easily add their own images or modify the Mage image to their liking. 
+## Future work
+- Add more data sources.
+- Use Spark, Iceberg and Minio to implement a lakehouse architecture and account for distributed compute and storage.
+- Use Airflow (or Astronomer) instead of Mage.

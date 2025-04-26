@@ -1,0 +1,230 @@
+import re
+from datetime import datetime
+import pandas as pd
+from hashlib import md5
+
+
+def snake_case_to_camelcase(word):
+    if "_" not in word:
+        return word
+    split_word = re.split("_+", word)
+    camelcase_word = split_word[0] + "".join(
+        x.capitalize() or "_" for x in split_word[1:]
+    )
+    return camelcase_word
+
+def french_titlecase(s):
+    if s is pd.NA or not s:
+        return s
+    # Define exceptions: words that should remain lowercase unless first word.
+    exceptions = {
+        'et', 'de', 'du', 'des', 'la', 'le', 'les', "d'", "l'"
+    }
+    words = s.split()
+    new_words = []
+    for i, w in enumerate(words):
+        lower_w = w.lower()
+        # Check if the word starts with "d'" or "l'"
+        if lower_w.startswith("d'") or lower_w.startswith("l'"):
+            # Capitalize only the part after the apostrophe.
+            prefix = w[:2]
+            rest = w[2:]
+            new_words.append(prefix + rest.capitalize())
+        elif i != 0 and lower_w in exceptions:
+            new_words.append(lower_w)
+        # if word is in all caps, leave as is
+        elif w == w.upper():
+            new_words.append(w)
+        else:
+            new_words.append(w.title())
+    return " ".join(new_words)
+
+def parse_emploitic_json(raw_json: str) -> list:
+    """parse and extract the job listings from the response json object returned from Emploitic api jobs request
+
+    Args:
+        raw_json (str): raw_json containing details about the job listings
+
+    Returns:
+        list[dict]: list of job listings as dicts
+    """
+    jobs = []
+
+    all_listings = raw_json.get("results")
+    if not all_listings:
+        return jobs
+
+    for listing in all_listings:
+        job_item = {}
+        job_item["title"] = listing.get("title")
+        job_item["positions"] = listing.get("openPositions")
+        job_item["datetime_published"] = listing.get("publishedAt")
+        job_item["work_mode"] = listing.get("workMode")
+        company = listing["company"]
+        job_item["company"] = company.get("name")
+        sector = company.get("sector")
+        if sector:
+            job_item["sector"] = sector.get("label")
+        job_item["date_scraped"] = datetime.now()
+        job_item["is_anonymous"] = listing.get("isAnonymous")
+
+        # These fields don't have a fixed type
+        job_criteria = listing["criteria"]
+        loosely_typed_fields = [
+            "location",
+            "function",
+            "job_level",
+            "education_level",
+            "contract_type",
+            "experience_years",
+        ]
+        for field in loosely_typed_fields:
+            # convert the field name for reading from the raw json
+            if field == "function":
+                camelcase_field = "profession"
+            else:
+                camelcase_field = snake_case_to_camelcase(field)
+
+            # Load the field value
+            raw_field_obj = job_criteria[camelcase_field]
+            # raw field is either a dict or a list of dicts
+            # we always want the `label` value
+            if isinstance(raw_field_obj, list):
+                job_item[field] = [
+                    field_value["label"] for field_value in raw_field_obj
+                ]
+
+            elif isinstance(raw_field_obj, dict):
+                job_item[field] = raw_field_obj["label"]
+
+            else:
+                job_item[field] = raw_field_obj
+
+        jobs.append(job_item)
+    return jobs
+
+
+def parse_emploi_partner_json(raw_json: str) -> list:
+    """parse and extract the job listings from the response json object returned from EmploiPartner api jobs request
+
+    Args:
+        raw_json (str): raw_json containing details about the job listings
+
+    Returns:
+        list[dict]: list of job listings as dicts
+    """
+    jobs = []
+
+    all_listings = raw_json.get("hydra:member")
+    if not all_listings:
+        return jobs
+
+    for listing in all_listings:
+        job_item = {}
+        first_order_fields = {
+            "title": "title",
+            "company": "companyName",
+            "positions": "nbPosition",
+            "datetime_published": "publishedDate",
+            "expire_date": "expireDate",
+            "nb_applicants": "nbApplicant",
+            "nb_views": "nbView",
+            "is_anonymous": "hideCompany",
+            "experience_years_id": "nbMonthExperience",
+        }
+        for k, v in first_order_fields.items():
+            job_item[k] = listing.get(v)
+
+        job_item["date_scraped"] = datetime.now()
+
+        nested_fields = {
+            "city": {"name": "city", "value_key": "name"},
+            "state": {"name": "region", "value_key": "name"},
+            "country": {"name": "country", "value_key": "name"},
+            "sector_id": {"name": "sectorGroup", "value_key": "id"},
+            "function_id": {"name": "function", "value_key": "id"},
+            "job_level": {"name": "careerLevel", "value_key": "name"},
+            "education_level": {"name": "studyLevel", "value_key": "name"},
+            "work_mode": {"name": "workplace", "value_key": "name"},
+        }
+        for k, v in nested_fields.items():
+            field_name = v.get("name")
+            field_value_key = v.get("value_key")
+            listing_value = listing.get(field_name)
+            if listing_value:
+                job_item[k] = listing_value.get(field_value_key)
+                if k == "state":
+                    job_item["region"] = listing_value.get("cardinal")
+            else:
+                job_item[k] = listing_value
+
+        # only contractTypes is a list
+        contract_types = listing.get("contractTypes")
+        if contract_types:
+            job_item["contract_type"] = [val.get("name") for val in contract_types]
+        else:
+            job_item["contract_type"] = contract_types
+
+        # salary has only min and max
+        salary = listing.get("salary")
+        if salary:
+            job_item["has_salary"] = True
+            job_item["min_salary"] = salary.get("min")
+            job_item["max_salary"] = salary.get("max")
+        else:
+            job_item["has_salary"] = False
+            job_item["min_salary"] = job_item["max_salary"] = salary
+
+        jobs.append(job_item)
+    return jobs
+
+
+def handle_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+
+    typed_df = df.convert_dtypes()
+    typed_df["datetime_published"] = pd.to_datetime(typed_df["datetime_published"])
+    typed_df["date_scraped"] = pd.to_datetime(typed_df["date_scraped"])
+    if "expire_date" in typed_df.columns:
+        typed_df["expire_date"] = pd.to_datetime(typed_df["expire_date"])
+
+    return typed_df
+
+
+def create_job_id_pkey(df: pd.DataFrame) -> pd.DataFrame:
+    """Create a job_id column using md5 hash of the title, company and datetime_published columns"""
+    df["combined_pkey"] = (
+        df["title"].fillna("")
+        + df["company"].fillna("")
+        + df["datetime_published"].astype(str).fillna("")
+    )
+    generate_id = lambda x: md5(x.encode()).hexdigest()
+    df["job_id"] = (
+        df["title"].str.split(" ").str.get(0).str.lower()
+        + "-"
+        + df["combined_pkey"].apply(generate_id).str.slice(stop=8)
+    )
+    df = df.drop(columns=["combined_pkey"])
+
+    return df
+
+def replace_values(df: pd.DataFrame, values_to_replace: dict) -> pd.DataFrame:
+    # convert dtypes to ensure that 'object' fields are arrays and not strings
+    df = df.convert_dtypes()
+
+    for field in values_to_replace:
+        if field not in df.columns:
+            raise KeyError(f"{field} is not a column in the input DataFrame")
+        if df[field].dtype == 'object':
+            replaced_column = (
+                df
+                .explode(field)
+                .replace({field: values_to_replace[field]})
+                .groupby("job_id")
+                .agg({field: lambda x: x.tolist()})
+                .loc[:, field]
+                .values
+            )
+            df[field] = replaced_column
+        else:
+            df[field] = df[field].replace(values_to_replace[field])
+    return df

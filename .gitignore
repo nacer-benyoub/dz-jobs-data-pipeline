@@ -102,7 +102,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 .DS_Store
 env/
@@ -170,3 +169,5 @@ scratch*
 /mage_data*
 *secrets*.json
 your-first-project
+.ssh_tunnel
+Dockerfile

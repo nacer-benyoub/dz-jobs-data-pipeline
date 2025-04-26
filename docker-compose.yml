@@ -1,18 +1,55 @@
-version: '3'
 services:
   magic:
     image: mageai/mageai:latest
+    container_name: ${MAGE_CONTAINER_NAME}
     command: mage start ${PROJECT_NAME}
     env_file:
-      - .env
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      USER_CODE_PATH: /home/src/${PROJECT_NAME}
-      ENV: ${ENV}
+      - dw.env
     ports:
       - 6789:6789
     volumes:
       - .:/home/src/
     restart: on-failure:5
+
+  postgres:
+    image: postgres:14
+    restart: on-failure
+    container_name: ${DW_CONTAINER_NAME}
+    env_file:
+      - dw.env
+    ports:
+      - "${DW_HOST_PORT}:${DW_CONTAINER_PORT}"
+    expose:
+      - ${DW_CONTAINER_PORT}
+    volumes:
+      - dz-job-pipeline-postgres-data:/var/lib/postgresql/data
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: ${METABASE_APP_CONTAINER_NAME}
+    volumes:
+      - /dev/urandom:/dev/random:ro
+    env_file:
+      - metabase.env
+    ports:
+      - ${MB_APP_HOST_PORT}:${MB_APP_CONTAINER_PORT}
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  
+  metabase-db:
+    image: postgres:14
+    container_name: ${METABASE_DB_CONTAINER_NAME}
+    env_file:
+      - metabase.env
+    expose:
+      - ${MB_DB_PORT}
+    volumes:
+      - dz-job-pipeline-metabase-data:/var/lib/postgresql/data
+
+
+volumes:
+  dz-job-pipeline-postgres-data:
+  dz-job-pipeline-metabase-data:

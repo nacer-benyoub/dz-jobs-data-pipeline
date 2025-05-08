@@ -1,5 +1,5 @@
 blocks:
-- all_upstream_blocks_executed: false
+- all_upstream_blocks_executed: true
   color: null
   configuration:
     file_path: data_loaders/load_emploitic_daily_snapshot.py
@@ -23,7 +23,7 @@ blocks:
   upstream_blocks:
   - ddl
   uuid: load_emploitic_daily_snapshot
-- all_upstream_blocks_executed: false
+- all_upstream_blocks_executed: true
   color: null
   configuration: {}
   downstream_blocks:
@@ -40,7 +40,7 @@ blocks:
   upstream_blocks:
   - ddl
   uuid: load_emploi_partner_daily_snapshot
-- all_upstream_blocks_executed: false
+- all_upstream_blocks_executed: true
   color: null
   configuration:
     file_path: transformers/transform_emploitic_data.py
@@ -54,13 +54,13 @@ blocks:
   language: python
   name: transform emploitic data
   retry_config: null
-  status: updated
+  status: executed
   timeout: null
   type: transformer
   upstream_blocks:
   - load_emploitic_daily_snapshot
   uuid: transform_emploitic_data
-- all_upstream_blocks_executed: false
+- all_upstream_blocks_executed: true
   color: null
   configuration: {}
   downstream_blocks:
@@ -71,7 +71,7 @@ blocks:
   language: python
   name: transform emploi partner data
   retry_config: null
-  status: executed
+  status: updated
   timeout: null
   type: transformer
   upstream_blocks:
@@ -161,7 +161,7 @@ blocks:
   language: sql
   name: ddl
   retry_config: null
-  status: updated
+  status: executed
   timeout: null
   type: custom
   upstream_blocks: []

@@ -52,7 +52,7 @@ SELECT
     expire_date,
     sector,
     CASE WHEN position('\' in contract_type) = 0 THEN
-        unistr(regex_replace(contract_type, 'u(\d+)', '\\u\1'))
+        unistr(regexp_replace(contract_type, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(contract_type)
     END as contract_type,
     education_level,

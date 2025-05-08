@@ -33,32 +33,32 @@ fixed_encoding AS (
     SELECT
         *,
         CASE WHEN position('\' in location) = 0 THEN
-            unistr(regex_replace(location, 'u(\d+)', '\\u\1'))
+            unistr(regexp_replace(location, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(location)
         END AS location_fixed_encoding,
 
         CASE WHEN position('\' in job_level) = 0 THEN
-            unistr(regex_replace(job_level, 'u(\d+)', '\\u\1'))
+            unistr(regexp_replace(job_level, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(job_level)
         END AS job_level_fixed_encoding,
 
         CASE WHEN position('\' in function) = 0 THEN
-            unistr(regex_replace(function, 'u(\d+)', '\\u\1'))
+            unistr(regexp_replace(function, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(function)
         END AS function_fixed_encoding,
 
         CASE WHEN position('\' in contract_type) = 0 THEN
-            unistr(regex_replace(contract_type, 'u(\d+)', '\\u\1'))
+            unistr(regexp_replace(contract_type, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(contract_type)
         END AS contract_type_fixed_encoding,
 
         CASE WHEN position('\' in education_level) = 0 THEN
-            unistr(regex_replace(education_level, 'u(\d+)', '\\u\1'))
+            unistr(regexp_replace(education_level, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(education_level)
         END AS education_level_fixed_encoding,
 
         CASE WHEN position('\' in experience_years) = 0 THEN
-            unistr(regex_replace(experience_years, 'u(\d+)', '\\u\1'))
+            unistr(regexp_replace(experience_years, 'u(\d+)', '\\u\1', 'g'))
         ELSE unistr(experience_years)
         END AS experience_years_fixed_encoding
     FROM unnested

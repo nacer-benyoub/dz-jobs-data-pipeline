@@ -1,7 +1,10 @@
 import re
 from datetime import datetime
 import pandas as pd
+from pandas import DataFrame
 from hashlib import md5
+
+import requests
 
 
 def snake_case_to_camelcase(word):
@@ -13,13 +16,12 @@ def snake_case_to_camelcase(word):
     )
     return camelcase_word
 
+
 def french_titlecase(s):
     if s is pd.NA or not s:
         return s
     # Define exceptions: words that should remain lowercase unless first word.
-    exceptions = {
-        'et', 'de', 'du', 'des', 'la', 'le', 'les', "d'", "l'"
-    }
+    exceptions = {"et", "de", "du", "des", "la", "le", "les", "d'", "l'"}
     words = s.split()
     new_words = []
     for i, w in enumerate(words):
@@ -38,6 +40,7 @@ def french_titlecase(s):
         else:
             new_words.append(w.title())
     return " ".join(new_words)
+
 
 def parse_emploitic_json(raw_json: str) -> list:
     """parse and extract the job listings from the response json object returned from Emploitic api jobs request
@@ -63,8 +66,10 @@ def parse_emploitic_json(raw_json: str) -> list:
         company = listing["company"]
         job_item["company"] = company.get("name")
         sector = company.get("sector")
+        keys = ["id", "label", "lang"]
         if sector:
-            job_item["sector"] = sector.get("label")
+            job_item["sector"] = {key: sector.get(key) for key in keys}
+
         job_item["date_scraped"] = datetime.now()
         job_item["is_anonymous"] = listing.get("isAnonymous")
 
@@ -85,17 +90,36 @@ def parse_emploitic_json(raw_json: str) -> list:
             else:
                 camelcase_field = snake_case_to_camelcase(field)
 
-            # Load the field value
-            raw_field_obj = job_criteria[camelcase_field]
+            # get the field value
+            # raw_field_obj = job_criteria[camelcase_field]
             # raw field is either a dict or a list of dicts
-            # we always want the `label` value
-            if isinstance(raw_field_obj, list):
-                job_item[field] = [
-                    field_value["label"] for field_value in raw_field_obj
-                ]
+            # we need the `label` value
+            # if isinstance(raw_field_obj, list):
+            #     job_item[field] = [
+            #         field_value["label"] for field_value in raw_field_obj
+            #     ]
 
+            # elif isinstance(raw_field_obj, dict):
+            #     job_item[field] = raw_field_obj["label"]
+
+            # else:
+            #     job_item[field] = raw_field_obj
+
+            # get the whole object because we need the `label`, 'id' and 'lang' values
+            raw_field_obj = job_criteria[camelcase_field]
+            if field in ["location", "contract_type"]:
+                job_item[field] = (
+                    [field_value["label"] for field_value in raw_field_obj]
+                    if raw_field_obj
+                    else raw_field_obj
+                )
+            elif isinstance(raw_field_obj, list):
+                job_item[field] = [
+                    {key: field_value[key] for key in keys}
+                    for field_value in raw_field_obj
+                ]
             elif isinstance(raw_field_obj, dict):
-                job_item[field] = raw_field_obj["label"]
+                job_item[field] = {key: raw_field_obj[key] for key in keys}
 
             else:
                 job_item[field] = raw_field_obj
@@ -179,7 +203,7 @@ def parse_emploi_partner_json(raw_json: str) -> list:
     return jobs
 
 
-def handle_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+def handle_dtypes(df: DataFrame) -> DataFrame:
 
     typed_df = df.convert_dtypes()
     typed_df["datetime_published"] = pd.to_datetime(typed_df["datetime_published"])
@@ -190,7 +214,7 @@ def handle_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     return typed_df
 
 
-def create_job_id_pkey(df: pd.DataFrame) -> pd.DataFrame:
+def create_job_id_pkey(df: DataFrame) -> DataFrame:
     """Create a job_id column using md5 hash of the title, company and datetime_published columns"""
     df["combined_pkey"] = (
         df["title"].fillna("")
@@ -207,24 +231,83 @@ def create_job_id_pkey(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-def replace_values(df: pd.DataFrame, values_to_replace: dict) -> pd.DataFrame:
+
+def replace_attribute_ids_with_values(
+    df: DataFrame,
+    attribute_url: str,
+    json_results_key: str,
+    df_join_key: str,
+    attribute_join_key: str,
+    attribute_source_name: str,
+    attribute_final_name: str,
+    values_lang: str = "fr",
+    join_method="left",
+) -> DataFrame:
+    """Fetch attribute values from its url and join with df
+    on given keys to replace them wih attribute values in df
+
+    Args:
+        df (DataFrame): original dataframe
+        attribute_url (str): url to fetch attribute data
+        json_results_key (str): key under which is mapping of attribute ids and values in response json
+        df_join_key (str): attribute join key in original dataframe
+        attribute_join_key (str): attribute join key in attribute dataframe
+        attribute_source_name (str): attribute name in attribute dataframe
+        attribute_final_name (str): attribute name in final dataframe
+        values_lang (str): prefered language for attribute values. To be passed as url `lang` query parameter. Defaults to "fr"
+        join_method (str, optional): original and attribute dataframe join method. Defaults to "left".
+
+    Returns:
+        DataFrame: final dataframe with attribute keys replaced by their respective values
+    """
+    params = {"lang": values_lang}
+    headers = {"Accept-Language": values_lang}
+    cleaned_url = re.sub("&lang=[^&]+", "", attribute_url).rstrip("?")
+    attribute_json_data = requests.get(
+        url=cleaned_url, params=params, headers=headers
+    ).json()[json_results_key]
+    attribute_df = DataFrame(attribute_json_data).convert_dtypes()
+    merged_df = df.merge(
+        right=attribute_df[[attribute_join_key, attribute_source_name]],
+        how=join_method,
+        left_on=df_join_key,
+        right_on=attribute_join_key,
+    )
+    merged_df = merged_df.drop(columns=[attribute_join_key, df_join_key])
+    merged_df = merged_df.rename(columns={attribute_source_name: attribute_final_name})
+    return merged_df
+
+
+def replace_values(df: DataFrame, values_to_replace: dict) -> DataFrame:
     # convert dtypes to ensure that 'object' fields are arrays and not strings
     df = df.convert_dtypes()
 
     for field in values_to_replace:
         if field not in df.columns:
             raise KeyError(f"{field} is not a column in the input DataFrame")
-        if df[field].dtype == 'object':
-            replaced_column = (
-                df
-                .explode(field)
-                .replace({field: values_to_replace[field]})
-                .groupby("job_id")
-                .agg({field: lambda x: x.tolist()})
-                .loc[:, field]
-                .values
-            )
-            df[field] = replaced_column
+        if df[field].dtype == "object":
+            # replaced_column = (
+            #     df.explode(field)
+            #     .replace(values_to_replace[field])
+            #     .groupby("job_id", sort=False)
+            #     .agg({field: lambda x: x.tolist()})
+            #     .loc[:, field]
+            #     .values
+            # )
+            val_map = values_to_replace[field]
+
+            def update_list(val_list, val_map):
+                if not val_list:
+                    return val_list
+                mapped_val_list = []
+                for val in val_list:
+                    if val in val_map:
+                        mapped_val_list.append(val_map[val])
+                    else:
+                        mapped_val_list.append(val)
+                return mapped_val_list
+
+            df[field] = df[field].apply(update_list, args=(val_map,))
         else:
             df[field] = df[field].replace(values_to_replace[field])
     return df

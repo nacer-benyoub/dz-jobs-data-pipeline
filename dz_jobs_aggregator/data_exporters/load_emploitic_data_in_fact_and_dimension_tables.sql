@@ -20,14 +20,15 @@ WITH unnested AS (
         COALESCE(job_source, 'Inconnu') AS job_source,
         date_scraped
     FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploitic
-    WHERE CASE
-        WHEN {{ backfill }} THEN
-            DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}')
-            AND DATE(NULLIF('{{ interval_end_datetime }}', 'None'))
-        ELSE
-            DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '1 day'
-            AND DATE('{{ interval_start_datetime }}')
-        END
+    WHERE DATE(date_scraped) = DATE('{{ execution_date }}')
+    -- WHERE CASE
+    --     WHEN {{ backfill }} THEN
+    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}')
+    --         AND DATE(NULLIF('{{ interval_end_datetime }}', 'None'))
+    --     ELSE
+    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '1 day'
+    --         AND DATE('{{ interval_start_datetime }}')
+    --     END
 ),
 fixed_encoding AS (
     SELECT
@@ -121,9 +122,9 @@ SELECT
 FROM
     temp_daily_snapshot_emploitic
 GROUP BY
-    1,
-    2,
-    3
+    city,
+    state,
+    country
 ON CONFLICT
     DO NOTHING;
 

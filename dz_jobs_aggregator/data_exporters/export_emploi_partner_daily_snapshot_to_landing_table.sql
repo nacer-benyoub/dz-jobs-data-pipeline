@@ -26,11 +26,11 @@ SELECT
     CAST(max_salary AS INTEGER) AS max_salary,
     CAST(nb_applicants AS INTEGER) AS nb_applicants,
     CAST(nb_views AS INTEGER) AS nb_views,
-    CAST(date_scraped AS TIMESTAMP) AS date_scraped,
+    CAST(date_scraped AS DATE) AS date_scraped,
     job_source
 
 FROM {{ df_1 }}
-ON CONFLICT(job_id)
+ON CONFLICT(job_id, date_scraped)
 DO UPDATE SET
     positions = EXCLUDED.positions,
     expire_date = EXCLUDED.expire_date,
@@ -51,5 +51,4 @@ DO UPDATE SET
     max_salary = EXCLUDED.max_salary,
     nb_applicants = EXCLUDED.nb_applicants,
     nb_views = EXCLUDED.nb_views,
-    date_scraped = EXCLUDED.date_scraped,
     job_source = EXCLUDED.job_source

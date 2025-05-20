@@ -80,12 +80,12 @@ default:
   PINOT_SCHEME: http
   PINOT_USER: user
   # PostgresSQL
-  POSTGRES_CONNECT_TIMEOUT: 10
-  POSTGRES_DBNAME: job_data
-  POSTGRES_SCHEMA: public # Optional
-  POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: postgres
-  POSTGRES_HOST: postgres
+  POSTGRES_CONNECT_TIMEOUT: 60
+  POSTGRES_DBNAME: "{{ env_var('POSTGRES_DB') }}"
+  # POSTGRES_SCHEMA: public # Optional
+  POSTGRES_USER: "{{ env_var('POSTGRES_USER') }}"
+  POSTGRES_PASSWORD: "{{ env_var('POSTGRES_PASSWORD') }}"
+  POSTGRES_HOST: "{{ env_var('POSTGRES_HOST') }}"
   POSTGRES_PORT: 5432
   # Qdrant
   QDRANT_COLLECTION: collection

@@ -36,6 +36,9 @@ def transform(data: pd.DataFrame, *args, **kwargs):
     # drop_duplicates
     data = data.drop_duplicates("job_id")
 
+    # add date_scraped column
+    data["date_scraped"] = kwargs.get('execution_date').date()
+
     # convert dtypes
     data = handle_dtypes(data)
 

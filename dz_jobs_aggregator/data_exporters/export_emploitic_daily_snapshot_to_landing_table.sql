@@ -18,7 +18,7 @@ SELECT
     CAST(experience_years AS TEXT[]) AS experience_years,
     CAST(is_anonymous AS BOOLEAN) AS is_anonymous,
     work_mode,
-    CAST(date_scraped AS TIMESTAMP) AS date_scraped,
+    CAST(date_scraped AS DATE) AS date_scraped,
     job_source
 
 FROM {{ df_1 }}

@@ -17,7 +17,7 @@ WITH unnested_coalesced AS (
         datetime_published,
         expire_date,
         COALESCE(sector, 'Inconnu') AS sector,
-        unnest(COALESCE(NULLIF(contract_type, ARRAY[NULL]), ARRAY['Inconnu'])) AS contract_type,
+        unnest(COALESCE(NULLIF(NULLIF(contract_type, '{}'), ARRAY[NULL]), ARRAY['Inconnu'])) AS contract_type,
         COALESCE(education_level, 'Inconnu') AS education_level,
         COALESCE(experience_years, 'Inconnu') AS experience_years,
         is_anonymous,
@@ -28,14 +28,15 @@ WITH unnested_coalesced AS (
         COALESCE(job_source, 'Inconnu') as job_source,
         date_scraped
     FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_partner
-    WHERE CASE
-        WHEN {{ backfill }} THEN
-            DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}')
-            AND DATE(NULLIF('{{ interval_end_datetime }}', 'None'))
-        ELSE
-            DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '30 day'
-            AND DATE('{{ interval_start_datetime }}')
-        END
+    WHERE DATE(date_scraped) = DATE('{{ execution_date }}')
+    -- WHERE CASE
+    --     WHEN {{ backfill }} THEN
+    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}')
+    --         AND DATE(NULLIF('{{ interval_end_datetime }}', 'None'))
+    --     ELSE
+    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '30 day'
+    --         AND DATE('{{ interval_start_datetime }}')
+    --     END
 )
 SELECT
     job_id,
@@ -181,18 +182,54 @@ DO UPDATE SET
 
 -- Populate the daily metrics fact table
 INSERT INTO {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_performance_daily
-SELECT
-    job_id,
-    date_scraped as date,
-    nb_applicants,
-    nb_views
-FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_partner
--- get new daily metrics for all jobs pulled today
-WHERE
+WITH raw_daily_snapshot AS (
+    SELECT
+        job_id,
+        datetime_published,
+        nb_applicants,
+        nb_views
+    FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_partner
+    -- get new daily metrics for all jobs pulled today
+    WHERE
     NOT {{ backfill }}
     AND
-    DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '30 day'
-        AND DATE('{{ interval_start_datetime }}')
+    DATE(date_scraped) = DATE('{{ execution_date }}')
+    -- DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '30 day'
+    --     AND DATE('{{ interval_start_datetime }}')
+),
+active_jobs_metric_totals AS (
+    SELECT
+        fct.job_id,
+        SUM(fct.nb_applicants) as nb_apps_total,
+        SUM(fct.nb_views) as nb_views_total
+    FROM {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_performance_daily fct
+    -- join to select only active jobs (filter out new jobs)
+    JOIN raw_daily_snapshot daily
+    USING(job_id)
+    GROUP BY fct.job_id
+),
+daily_snapshot AS (
+    SELECT
+        daily.job_id,
+        DATE('{{ execution_date }}') as date,
+        COALESCE(daily.nb_applicants - active.nb_apps_total, daily.nb_applicants) as nb_applicants,
+        COALESCE(
+            daily.nb_views - active.nb_views_total,
+            daily.nb_views
+        ) as nb_views,
+        DATE('{{ execution_date }}') - DATE(daily.datetime_published) as days_since_published
+    
+    FROM raw_daily_snapshot daily
+    LEFT JOIN active_jobs_metric_totals active
+    USING(job_id)
+)
+SELECT
+    job_id,
+    date,
+    nb_applicants,
+    nb_views,
+    days_since_published
+FROM daily_snapshot
 ON CONFLICT(job_id, date)
 DO UPDATE SET
     nb_applicants = EXCLUDED.nb_applicants,

@@ -22,8 +22,12 @@ def load_data_from_api(*args, **kwargs):
     print(f"backfill: {backfill}")
     ds = kwargs["interval_start_datetime"]
     print(f"ds: {ds}")
-    # timestamp is needed because it's the only datetime format the API uses for date filtering
+    print(f"env: {kwargs['env']}")
+    print(f"execution_date: {kwargs['execution_date']}")
+    # print(f"pipeline_run_id: {kwargs['pipeline_run_id']}")
+    # print(f"execution_partition: {kwargs['execution_partition']}")
 
+    # timestamp is needed because it's the only datetime format the API uses for date filtering
     if backfill:
         ds_ts = int(ds.timestamp() * 1000)
         next_ds = kwargs.get("interval_end_datetime")

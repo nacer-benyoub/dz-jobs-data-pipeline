@@ -171,3 +171,4 @@ scratch*
 your-first-project
 .ssh_tunnel
 Dockerfile
+prod.dw.env

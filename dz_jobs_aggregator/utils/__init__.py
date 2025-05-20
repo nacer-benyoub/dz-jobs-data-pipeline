@@ -70,7 +70,6 @@ def parse_emploitic_json(raw_json: str) -> list:
         if sector:
             job_item["sector"] = {key: sector.get(key) for key in keys}
 
-        job_item["date_scraped"] = datetime.now()
         job_item["is_anonymous"] = listing.get("isAnonymous")
 
         # These fields don't have a fixed type
@@ -158,8 +157,6 @@ def parse_emploi_partner_json(raw_json: str) -> list:
         }
         for k, v in first_order_fields.items():
             job_item[k] = listing.get(v)
-
-        job_item["date_scraped"] = datetime.now()
 
         nested_fields = {
             "city": {"name": "city", "value_key": "name"},

@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_pa
     nb_views integer,
     date_scraped date,
     job_source text DEFAULT 'Inconnu'::text,
-    PRIMARY KEY(job_id)
+    PRIMARY KEY(job_id, date_scraped)
 );
 
 ----------------- Silver schema DDL ------------------------ 
@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_perfo
     date DATE,
     nb_applicants INTEGER,
     nb_views INTEGER,
+    days_since_published INTEGER,
     PRIMARY KEY (job_id, date)
 );
 

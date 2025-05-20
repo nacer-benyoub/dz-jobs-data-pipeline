@@ -75,6 +75,9 @@ def transform(data, *args, **kwargs):
         attribute_final_name="function",
     )
 
+    # add date_scraped column
+    data["date_scraped"] = kwargs.get("execution_date").date()
+
     # convert dtypes
     data = handle_dtypes(data)
     print(data.dtypes)

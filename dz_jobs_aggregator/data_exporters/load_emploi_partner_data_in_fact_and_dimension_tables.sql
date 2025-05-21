@@ -29,14 +29,6 @@ WITH unnested_coalesced AS (
         date_scraped
     FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_partner
     WHERE DATE(date_scraped) = DATE('{{ execution_date }}')
-    -- WHERE CASE
-    --     WHEN {{ backfill }} THEN
-    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}')
-    --         AND DATE(NULLIF('{{ interval_end_datetime }}', 'None'))
-    --     ELSE
-    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '30 day'
-    --         AND DATE('{{ interval_start_datetime }}')
-    --     END
 )
 SELECT
     job_id,
@@ -194,8 +186,6 @@ WITH raw_daily_snapshot AS (
     NOT {{ backfill }}
     AND
     DATE(date_scraped) = DATE('{{ execution_date }}')
-    -- DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '30 day'
-    --     AND DATE('{{ interval_start_datetime }}')
 ),
 active_jobs_metric_totals AS (
     SELECT

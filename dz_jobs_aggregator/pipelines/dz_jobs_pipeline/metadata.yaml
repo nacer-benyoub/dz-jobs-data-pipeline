@@ -191,7 +191,8 @@ blocks:
       path: data_exporters/load_emploitic_data_in_fact_and_dimension_tables.sql
     limit: 1000
     use_raw_sql: true
-  downstream_blocks: []
+  downstream_blocks:
+  - update_gold_layer
   executor_config: null
   executor_type: local_python
   has_callback: false
@@ -214,7 +215,8 @@ blocks:
     export_write_policy: append
     limit: 1000
     use_raw_sql: true
-  downstream_blocks: []
+  downstream_blocks:
+  - update_gold_layer
   executor_config: null
   executor_type: local_python
   has_callback: false
@@ -227,6 +229,30 @@ blocks:
   upstream_blocks:
   - export_emploi_partner_daily_snapshot_to_landing_table
   uuid: load_emploi_partner_data_in_fact_and_dimension_tables
+- all_upstream_blocks_executed: false
+  color: null
+  configuration:
+    data_provider: postgres
+    data_provider_profile: default
+    dbt: {}
+    disable_query_preprocessing: true
+    export_write_policy: append
+    limit: 1000
+    use_raw_sql: true
+  downstream_blocks: []
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: sql
+  name: update gold layer
+  retry_config: null
+  status: executed
+  timeout: null
+  type: data_exporter
+  upstream_blocks:
+  - load_emploi_partner_data_in_fact_and_dimension_tables
+  - load_emploitic_data_in_fact_and_dimension_tables
+  uuid: update_gold_layer
 cache_block_output_in_memory: false
 callbacks: []
 concurrency_config: {}

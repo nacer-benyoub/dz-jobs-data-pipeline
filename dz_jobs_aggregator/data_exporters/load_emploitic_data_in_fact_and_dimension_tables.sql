@@ -21,14 +21,6 @@ WITH unnested AS (
         date_scraped
     FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploitic
     WHERE DATE(date_scraped) = DATE('{{ execution_date }}')
-    -- WHERE CASE
-    --     WHEN {{ backfill }} THEN
-    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}')
-    --         AND DATE(NULLIF('{{ interval_end_datetime }}', 'None'))
-    --     ELSE
-    --         DATE(datetime_published) BETWEEN DATE('{{ interval_start_datetime }}') - INTERVAL '1 day'
-    --         AND DATE('{{ interval_start_datetime }}')
-    --     END
 ),
 fixed_encoding AS (
     SELECT

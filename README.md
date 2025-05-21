@@ -5,7 +5,7 @@ This is an ETL data pipeline that extracts job market data from two Algerian job
 The pipeline follows a medallion architecture with 3 layers:
 - **Bronze layer**: raw and staging data.
 - **Silver layer**: fact and dimension tables.
-- **Gold layer**: marts and pre-aggregated data.
+- **Gold layer**: pre-joined bridge and dimension tables as views and pre-aggregated data.
 
 ## Challenges
 - Modeling many-to-many relashionships using bridge tables.

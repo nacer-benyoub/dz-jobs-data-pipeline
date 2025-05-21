@@ -20,12 +20,11 @@ def load_data_from_api(*args, **kwargs):
     PAGE = kwargs.get("PAGE", 1)
     backfill = kwargs.get("backfill", False)
     print(f"backfill: {backfill}")
-    ds = kwargs["interval_start_datetime"]
+    ds = kwargs["execution_date"]
     print(f"ds: {ds}")
-    print(f"env: {kwargs['env']}")
-    print(f"execution_date: {kwargs['execution_date']}")
-    # print(f"pipeline_run_id: {kwargs['pipeline_run_id']}")
-    # print(f"execution_partition: {kwargs['execution_partition']}")
+    print(f"env: {kwargs.get('env')}")
+    print(f"pipeline_run_id: {kwargs.get('pipeline_run_id')}")
+    print(f"execution_partition: {kwargs.get('execution_partition')}")
 
     # timestamp is needed because it's the only datetime format the API uses for date filtering
     if backfill:
@@ -33,17 +32,24 @@ def load_data_from_api(*args, **kwargs):
         next_ds = kwargs.get("interval_end_datetime")
         print(f"next_ds: {next_ds}")
         next_ds_ts = int(next_ds.timestamp() * 1000)
-        params_filter = f"(publishedAt_timestamp>={ds_ts}) AND (publishedAt_timestamp<{next_ds_ts})",  # get all jobs publsihed within the backfill interval
+        params_filter = (
+            f"(publishedAt_timestamp>={ds_ts}) AND (publishedAt_timestamp<{next_ds_ts})",
+        )  # get all jobs publsihed within the backfill interval
     else:
         # truncate to the start of day to get fresh job listings
         ds_ts = int(datetime(ds.year, ds.month, ds.day).timestamp() * 1000)
         yesterday_ds = ds - timedelta(days=1)
         print(f"yesterday_ds: {yesterday_ds}")
         yesterday_ds_ts = int(
-            datetime(yesterday_ds.year, yesterday_ds.month, yesterday_ds.day).timestamp() * 1000
+            datetime(
+                yesterday_ds.year, yesterday_ds.month, yesterday_ds.day
+            ).timestamp()
+            * 1000
         )
-        params_filter = f"(publishedAt_timestamp<{ds_ts}) AND (publishedAt_timestamp>={yesterday_ds_ts})",  # get only jobs publsihed in the last day
-    
+        params_filter = (
+            f"(publishedAt_timestamp<{ds_ts}) AND (publishedAt_timestamp>={yesterday_ds_ts})",
+        )  # get only jobs publsihed in the last day
+
     BASE_URL = "https://emploitic.com/api/v4/jobs"
     params = {
         "sort[0]": "publishedAt_timestamp:desc",

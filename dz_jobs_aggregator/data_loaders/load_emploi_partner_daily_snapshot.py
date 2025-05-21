@@ -20,15 +20,18 @@ def load_data_from_api(*args, **kwargs):
     PAGE = kwargs.get("PAGE", 1)
     backfill = kwargs.get("backfill", False)
     print(f"backfill: {backfill}")
-    ds = kwargs["interval_start_datetime"]
-    
+    ds = kwargs["execution_date"]
+    print(f"env: {kwargs.get('env')}")
+    print(f"pipeline_run_id: {kwargs.get('pipeline_run_id')}")
+    print(f"execution_partition: {kwargs.get('execution_partition')}")
+
     if backfill:
         print(f"ds: {ds}")
         next_ds = kwargs.get("interval_end_datetime")
         print(f"next_ds: {next_ds}")
         params_filter = {
             "publishedDate[after]": ds,
-            "publishedDate[strictly_before]": next_ds
+            "publishedDate[strictly_before]": next_ds,
         }
     else:
         # get the daily metrics of all the jobs published within the last month to track them
@@ -39,9 +42,9 @@ def load_data_from_api(*args, **kwargs):
         print(f"last_month_ds: {last_month_ds}")
         params_filter = {
             "publishedDate[after]": last_month_ds,
-            "publishedDate[strictly_before]": ds
+            "publishedDate[strictly_before]": ds,
         }
-    
+
     BASE_URL = "https://api-v4.emploipartner.com/api/jobs"
     params = {
         "order[publishedDate]": "desc",
@@ -53,14 +56,14 @@ def load_data_from_api(*args, **kwargs):
     response_json = response.json()
     print(f"jobs to fetch: {response_json['hydra:totalItems']}")
     jobs = parse_emploi_partner_json(response_json)
-    
+
     pagination = response_json.get("hydra:view")
     if pagination and pagination.get("hydra:last"):
         total_pages = pagination.get("hydra:last").split("_page=")[-1]
         print(f"total pages: {total_pages}")
         next_endpoint = pagination.get("hydra:next")
         while next_endpoint:
-            next_url_params = next_endpoint.split('/api/jobs')[-1]
+            next_url_params = next_endpoint.split("/api/jobs")[-1]
             response = requests.get(BASE_URL + next_url_params)
             print(response.url)
             response_json = response.json()

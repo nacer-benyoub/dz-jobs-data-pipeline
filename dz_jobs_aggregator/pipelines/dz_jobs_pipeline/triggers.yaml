@@ -1,17 +1,19 @@
 triggers:
 - description: null
   envs: []
-  last_enabled_at: 2025-05-19 18:10:08.837876
-  name: daily trigger
+  last_enabled_at: 2025-05-21 19:44:41.456833
+  name: api trigger
   pipeline_uuid: dz_jobs_pipeline
-  schedule_interval: '@daily'
-  schedule_type: time
+  schedule_interval: null
+  schedule_type: api
   settings:
-    allow_blocks_to_fail: true
-  sla: null
-  start_time: 2025-05-19 01:00:00
+    allow_blocks_to_fail: false
+    timeout: '600'
+    timeout_status: failed
+  sla: 300
+  start_time: 2025-05-21 19:42:00
   status: active
-  token: aaff5bb9ffdb460e9215b7497d42fd55
+  token: 4f2159a3b8fc41148d602aa052b88e5f
   variables:
     NUM_LISTINGS: 100
     PAGE: 1

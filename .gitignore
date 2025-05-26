@@ -172,3 +172,5 @@ your-first-project
 .ssh_tunnel
 Dockerfile
 prod.dw.env
+run_pipeline_with_rest_api.py
+requirements.txt

@@ -81,7 +81,7 @@ default:
   PINOT_USER: user
   # PostgresSQL
   POSTGRES_CONNECT_TIMEOUT: 60
-  POSTGRES_DBNAME: "{{ env_var('POSTGRES_DB') }}"
+  POSTGRES_DBNAME: "{{ env_var('POSTGRES_DWH_DB') }}"
   # POSTGRES_SCHEMA: public # Optional
   POSTGRES_USER: "{{ env_var('POSTGRES_USER') }}"
   POSTGRES_PASSWORD: "{{ env_var('POSTGRES_PASSWORD') }}"

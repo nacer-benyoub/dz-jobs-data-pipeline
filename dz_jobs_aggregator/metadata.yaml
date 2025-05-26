@@ -46,12 +46,34 @@ spark_config:
 help_improve_mage: true
 notification_config:
   alert_on:
+  - trigger_success
   - trigger_failure
   - trigger_passed_sla
-  slack_config:
-    webhook_url: "{{ env_var('MAGE_SLACK_WEBHOOK_URL') }}"
-  teams_config:
-    webhook_url: "{{ env_var('MAGE_TEAMS_WEBHOOK_URL') }}"
+  telegram_config:
+    webhook_url: "{{ env_var('TELEGRAM_WEBHOOK_URL') }}"
+  message_templates:
+    failure:
+      title: '🚨 Failed to run pipeline {pipeline_uuid} at {execution_time}'
+      summary: >
+        Failed to run pipeline {pipeline_run_url}.
+
+        🔗 Trigger name: {pipeline_schedule_name}.
+
+        🐞 Error: {error}
+    success:
+      title: '✅ [{pipeline_uuid}] pipeline run completed successfully at {execution_time}'
+      summary: >
+        Pipeline run {pipeline_run_url} was completed successfully.
+
+        🔗 Trigger name: {pipeline_schedule_name}.
+
+    passed_sla:
+      title: '⚠ [{pipeline_uuid}] pipeline run passed the SLA at {execution_time}'
+      summary: >
+        Pipeline run {pipeline_run_url} took longer than the SLA.
+
+        🔗 Trigger name: {pipeline_schedule_name}.
+
 project_uuid: 444c288789ac4b7eb12dcca331a28a11
 features:
   display_local_timezone: false

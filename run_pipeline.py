@@ -1,9 +1,5 @@
-import json
 import logging
 import os
-from pprint import pprint
-from mage_ai.data_preparation.logging.logger import DictLogger
-from mage_ai.data_preparation.logging.logger_manager_factory import LoggerManagerFactory
 import requests
 
 from mage_ai.orchestration.db import db_connection

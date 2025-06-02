@@ -174,3 +174,5 @@ Dockerfile
 prod.dw.env
 run_pipeline_with_rest_api.py
 requirements.txt
+setup_local_mage.sh
+setup_local_mage_prod.sh

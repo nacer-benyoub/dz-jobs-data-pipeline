@@ -1,0 +1,103 @@
+name: Daily Mage ETL
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  mage-etl:
+    runs-on: ubuntu-latest
+    env:
+      USER_CODE_PATH: dz_jobs_aggregator
+      POSTGRES_BRONZE_SCHEMA: ${{ vars.POSTGRES_BRONZE_SCHEMA }}
+      POSTGRES_SILVER_SCHEMA: ${{ vars.POSTGRES_SILVER_SCHEMA }}
+      POSTGRES_GOLD_SCHEMA: ${{ vars.POSTGRES_GOLD_SCHEMA }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_DWH_DB: ${{ secrets.POSTGRES_DWH_DB }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      MAGE_DATABASE_CONNECTION_URL: ${{ secrets.MAGE_DATABASE_CONNECTION_URL }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_WEBHOOK_URL: ${{ secrets.TELEGRAM_WEBHOOK_URL }}
+      MAGE_CONTAINER_NAME: mage_container
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Start Mage container
+        run: |
+          docker run \
+            -d \
+            -e POSTGRES_BRONZE_SCHEMA \
+            -e POSTGRES_SILVER_SCHEMA \
+            -e POSTGRES_GOLD_SCHEMA \
+            -e POSTGRES_HOST \
+            -e POSTGRES_USER \
+            -e POSTGRES_DWH_DB \
+            -e POSTGRES_PASSWORD \
+            -e MAGE_DATABASE_CONNECTION_URL \
+            -e TELEGRAM_BOT_TOKEN \
+            -e TELEGRAM_CHAT_ID \
+            -e TELEGRAM_WEBHOOK_URL \
+            -e USER_CODE_PATH \
+            -v ${{ github.workspace }}:/home/src \
+            -p 6789:6789 \
+            --restart on-failure:5 \
+            --name $MAGE_CONTAINER_NAME \
+            mageai/mageai:0.9.76 bash -c \
+            "mage start $USER_CODE_PATH > mage_server.log 2>&1"
+
+      - name: Wait for Mage server to be ready
+        run: |
+          for i in {1..10}; do
+            if curl -sf http://localhost:6789 > /dev/null; then
+              echo "Mage server is up."
+              break
+            else
+              echo "Waiting for Mage server..."
+              sleep 5
+            fi
+          done
+          if ! curl -sf http://localhost:6789 > /dev/null; then
+            echo "Polling timed out. Mage server is not responding."
+            exit 1
+          fi
+        
+      - name: Check DB readiness
+        run: |
+          DB_URL="${{ secrets.MAGE_DATABASE_CONNECTION_URL }}"
+          CLEANED_DB_URL=$(echo "$DB_URL" | sed 's/postgresql+psycopg2/postgresql/')
+          for i in {1..10}; do
+            TABLE_COUNT=$(psql "$CLEANED_DB_URL" -tAc "SELECT count(1) FROM information_schema.tables WHERE table_schema = 'public';")
+            echo "Found $TABLE_COUNT/18 tables."
+            if [ "$TABLE_COUNT" -ge 18 ]; then
+              echo "Mage tables are ready."
+              break
+            else
+              echo "Waiting for Mage to finish creating tables..."
+              sleep 5
+            fi
+          done
+          TABLE_COUNT=$(psql "$CLEANED_DB_URL" -tAc "SELECT count(1) FROM information_schema.tables WHERE table_schema = 'public';")
+          if [ "$TABLE_COUNT" -lt 18 ]; then
+            echo "Polling timed out. Mage tables are not ready."
+            exit 1
+          fi
+
+      - name: Run Mage pipeline
+        run: |
+          docker exec $MAGE_CONTAINER_NAME python run_pipeline.py
+        continue-on-error: true  # allows logs to persist even if run fails
+
+      - name: Upload Mage run data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mage_data
+          path: |
+            mage_data
+            mage_server.log
+          overwrite: true
+          include-hidden-files: true

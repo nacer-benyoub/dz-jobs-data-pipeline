@@ -10,16 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       USER_CODE_PATH: dz_jobs_aggregator
-      POSTGRES_BRONZE_SCHEMA: ${{ vars.POSTGRES_BRONZE_SCHEMA }}
-      POSTGRES_SILVER_SCHEMA: ${{ vars.POSTGRES_SILVER_SCHEMA }}
-      POSTGRES_GOLD_SCHEMA: ${{ vars.POSTGRES_GOLD_SCHEMA }}
+      POSTGRES_BRONZE_SCHEMA: bronze
+      POSTGRES_SILVER_SCHEMA: silver
+      POSTGRES_GOLD_SCHEMA: gold
       POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
       POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
       POSTGRES_DWH_DB: ${{ secrets.POSTGRES_DWH_DB }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       MAGE_DATABASE_CONNECTION_URL: ${{ secrets.MAGE_DATABASE_CONNECTION_URL }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       TELEGRAM_WEBHOOK_URL: ${{ secrets.TELEGRAM_WEBHOOK_URL }}
       MAGE_CONTAINER_NAME: mage_container
     steps:
@@ -38,8 +36,6 @@ jobs:
             -e POSTGRES_DWH_DB \
             -e POSTGRES_PASSWORD \
             -e MAGE_DATABASE_CONNECTION_URL \
-            -e TELEGRAM_BOT_TOKEN \
-            -e TELEGRAM_CHAT_ID \
             -e TELEGRAM_WEBHOOK_URL \
             -e USER_CODE_PATH \
             -v ${{ github.workspace }}:/home/src \

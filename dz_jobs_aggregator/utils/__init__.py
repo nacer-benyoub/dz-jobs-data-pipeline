@@ -114,11 +114,11 @@ def parse_emploitic_json(raw_json: str) -> list:
                 )
             elif isinstance(raw_field_obj, list):
                 job_item[field] = [
-                    {key: field_value[key] for key in keys}
+                    {key: field_value.get(key) for key in keys}
                     for field_value in raw_field_obj
                 ]
             elif isinstance(raw_field_obj, dict):
-                job_item[field] = {key: raw_field_obj[key] for key in keys}
+                job_item[field] = {key: raw_field_obj.get(key) for key in keys}
 
             else:
                 job_item[field] = raw_field_obj

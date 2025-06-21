@@ -178,3 +178,4 @@ setup_local_mage.sh
 setup_local_mage_prod.sh
 notes.md
 prod_mage_data
+download_all_github_artifacts.sh

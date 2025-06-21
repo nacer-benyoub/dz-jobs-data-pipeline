@@ -39,6 +39,8 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    depends_on:
+      - metabase-db
   
   metabase-db:
     image: postgres:14

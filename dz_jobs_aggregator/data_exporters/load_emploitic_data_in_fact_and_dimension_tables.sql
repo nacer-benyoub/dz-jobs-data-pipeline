@@ -79,9 +79,15 @@ SELECT
     job_source,
     date_scraped,
     location_fixed_encoding AS location,
-    COALESCE(location_array[cardinality(location_array) - 3], 'Inconnu') AS city,
-    COALESCE(location_array[cardinality(location_array) - 1], 'Inconnu') AS state,
-    COALESCE(location_array[cardinality(location_array)], 'Inconnu') AS country
+    CASE WHEN location_array IS NOT NULL THEN
+        COALESCE(location_array[cardinality(location_array) - 3], 'Inconnu')
+    END AS city,
+    CASE WHEN location_array IS NOT NULL THEN
+        COALESCE(location_array[cardinality(location_array) - 1], 'Inconnu')
+    END AS state,
+    CASE WHEN location_array IS NOT NULL THEN
+        COALESCE(location_array[cardinality(location_array)], 'Inconnu')
+    END AS country
 FROM split_locations
 ;
 
@@ -113,6 +119,9 @@ SELECT
     country
 FROM
     temp_daily_snapshot_emploitic
+WHERE city IS NOT NULL
+    AND state IS NOT NULL
+    AND country IS NOT NULL
 GROUP BY
     city,
     state,

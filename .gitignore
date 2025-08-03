@@ -179,3 +179,8 @@ setup_local_mage_prod.sh
 notes.md
 prod_mage_data
 download_all_github_artifacts.sh
+process_and_annotate_parquet.py
+emploipartner_combined_raw_untransformed_data.csv
+emploitic_combined_raw_untransformed_data.csv
+explore_API_data.ipynb
+transformed.csv

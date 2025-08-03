@@ -1,6 +1,7 @@
 -- Docs: https://docs.mage.ai/guides/sql-blocks
 -- Docs: https://docs.mage.ai/guides/sql-blocks
 -- Create temp tables
+DROP TABLE IF EXISTS temp_daily_listings_snapshot_emploi_partner;
 CREATE TEMP TABLE temp_daily_listings_snapshot_emploi_partner AS
 WITH unnested_coalesced AS (
     SELECT
@@ -138,7 +139,7 @@ INSERT INTO {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_jobs (
     date_scraped
 )
 SELECT
-    DISTINCT t.job_id,
+    DISTINCT ON (t.job_id) t.job_id,
     t.title,
     c.company_id,
     s.sector_id,
@@ -157,6 +158,7 @@ JOIN {{ env_var("POSTGRES_SILVER_SCHEMA") }}.dim_company c
     ON t.company = c.company_name
 JOIN {{ env_var("POSTGRES_SILVER_SCHEMA") }}.dim_sector s
     ON t.sector = s.sector_description
+ORDER BY t.job_id, t.expire_date ASC
 ON CONFLICT(job_id)
 DO UPDATE SET
     company_id = EXCLUDED.company_id,
@@ -170,60 +172,6 @@ DO UPDATE SET
     max_salary = EXCLUDED.max_salary,
     job_source = EXCLUDED.job_source,
     date_scraped = EXCLUDED.date_scraped
-;
-
--- Populate the daily metrics fact table
-INSERT INTO {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_performance_daily
-WITH raw_daily_snapshot AS (
-    SELECT
-        job_id,
-        datetime_published,
-        nb_applicants,
-        nb_views
-    FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_partner
-    -- get new daily metrics for all jobs pulled today
-    WHERE
-    NOT {{ backfill }}
-    AND
-    DATE(date_scraped) = DATE('{{ execution_date }}')
-),
-active_jobs_metric_totals AS (
-    SELECT
-        fct.job_id,
-        SUM(fct.nb_applicants) as nb_apps_total,
-        SUM(fct.nb_views) as nb_views_total
-    FROM {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_performance_daily fct
-    -- join to select only active jobs (filter out new jobs)
-    JOIN raw_daily_snapshot daily
-    USING(job_id)
-    GROUP BY fct.job_id
-),
-daily_snapshot AS (
-    SELECT
-        daily.job_id,
-        DATE('{{ execution_date }}') as date,
-        COALESCE(daily.nb_applicants - active.nb_apps_total, daily.nb_applicants) as nb_applicants,
-        COALESCE(
-            daily.nb_views - active.nb_views_total,
-            daily.nb_views
-        ) as nb_views,
-        DATE('{{ execution_date }}') - DATE(daily.datetime_published) as days_since_published
-    
-    FROM raw_daily_snapshot daily
-    LEFT JOIN active_jobs_metric_totals active
-    USING(job_id)
-)
-SELECT
-    job_id,
-    date,
-    nb_applicants,
-    nb_views,
-    days_since_published
-FROM daily_snapshot
-ON CONFLICT(job_id, date)
-DO UPDATE SET
-    nb_applicants = EXCLUDED.nb_applicants,
-    nb_views = EXCLUDED.nb_views
 ;
 
 -- Populate bridge tables
@@ -287,4 +235,81 @@ FROM temp_daily_listings_snapshot_emploi_partner t
 JOIN {{ env_var("POSTGRES_SILVER_SCHEMA") }}.dim_experience_requirements er 
     ON t.experience_years = er.experience_requirements_description
 ON CONFLICT DO NOTHING
+;
+
+-- Populate the daily metrics fact table
+INSERT INTO {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_performance_daily
+-- pre-joined location bridge and dimension tables
+WITH br_dim AS (
+    SELECT
+        br.job_id,
+        br.location_id,
+        dim.city,
+        dim.state,
+        dim.region,
+        dim.country
+    FROM {{ env_var("POSTGRES_SILVER_SCHEMA") }}.br_job_location br
+    JOIN {{ env_var("POSTGRES_SILVER_SCHEMA") }}.dim_location dim
+    ON br.location_id = dim.location_id
+),
+-- get new daily metrics for all jobs pulled today
+raw_daily_snapshot AS (
+    SELECT
+        stg.job_id,
+        bd.location_id,
+        stg.datetime_published,
+        stg.nb_applicants,
+        stg.nb_views,
+        stg.date_scraped
+    -- using staging table instead of temp table because of the different grain
+    -- temp table has unnested array columns so it has duplicate nb_views and nb_applicants
+    FROM {{ env_var("POSTGRES_BRONZE_SCHEMA") }}.stg_emploi_partner stg
+    JOIN br_dim bd
+    USING(job_id, city, state, region, country)
+    WHERE DATE(stg.date_scraped) = DATE('{{ execution_date }}')
+),
+-- get totals for active jobs
+-- active = job that has both old and new metric values
+active_jobs_metric_totals AS (
+    SELECT
+        fct.job_id,
+        fct.location_id,
+        SUM(fct.nb_applicants) as nb_apps_total,
+        SUM(fct.nb_views) as nb_views_total
+    FROM {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_job_performance_daily fct
+    -- join to select only active jobs (filter out new jobs)
+    JOIN raw_daily_snapshot daily
+    USING(job_id, location_id)
+    WHERE DATE(fct.date) < DATE('{{ execution_date }}')
+    GROUP BY fct.job_id, fct.location_id
+),
+-- combine new and active jobs for insertion
+daily_snapshot AS (
+    SELECT
+        daily.job_id,
+        daily.location_id,
+        DATE('{{ execution_date }}') as date,
+        COALESCE(daily.nb_applicants - active.nb_apps_total, daily.nb_applicants) as nb_applicants,
+        COALESCE(
+            daily.nb_views - active.nb_views_total,
+            daily.nb_views
+        ) as nb_views,
+        DATE('{{ execution_date }}') - DATE(daily.datetime_published) as days_since_published
+    
+    FROM raw_daily_snapshot daily
+    LEFT JOIN active_jobs_metric_totals active
+    USING(job_id, location_id)
+)
+SELECT
+    job_id,
+    location_id,
+    date,
+    nb_applicants,
+    nb_views,
+    days_since_published
+FROM daily_snapshot
+ON CONFLICT(job_id, location_id, date)
+DO UPDATE SET
+    nb_applicants = EXCLUDED.nb_applicants,
+    nb_views = EXCLUDED.nb_views
 ;

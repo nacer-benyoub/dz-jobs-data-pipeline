@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS {{ env_var('POSTGRES_BRONZE_SCHEMA') }}.stg_emploi_pa
     nb_views integer,
     date_scraped date,
     job_source text DEFAULT 'Inconnu'::text,
-    PRIMARY KEY(job_id, date_scraped)
+    UNIQUE(date_scraped, job_id, city, state, region, country)
 );
 
 ----------------- Silver schema DDL ------------------------ 
@@ -152,16 +152,6 @@ CREATE TABLE IF NOT EXISTS {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_jobs (
     PRIMARY KEY (job_id)
 );
 
--- create the fct_job_performance_daily table
-CREATE TABLE IF NOT EXISTS {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_job_performance_daily (
-    job_id TEXT REFERENCES {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_jobs(job_id),
-    date DATE,
-    nb_applicants INTEGER,
-    nb_views INTEGER,
-    days_since_published INTEGER,
-    PRIMARY KEY (job_id, date)
-);
-
 -- create bridge tables
 CREATE TABLE IF NOT EXISTS {{ env_var('POSTGRES_SILVER_SCHEMA') }}.br_job_location (
     job_id TEXT REFERENCES {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_jobs(job_id) ON DELETE CASCADE,
@@ -197,4 +187,15 @@ CREATE TABLE IF NOT EXISTS {{ env_var('POSTGRES_SILVER_SCHEMA') }}.br_job_experi
     job_id TEXT REFERENCES {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_jobs(job_id) ON DELETE CASCADE,
     experience_requirements_id INTEGER REFERENCES {{ env_var('POSTGRES_SILVER_SCHEMA') }}.dim_experience_requirements(experience_requirements_id) ON DELETE CASCADE,
     PRIMARY KEY (job_id, experience_requirements_id)
+);
+
+-- create the fct_job_performance_daily table
+CREATE TABLE IF NOT EXISTS {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_job_performance_daily (
+    job_id TEXT REFERENCES {{ env_var('POSTGRES_SILVER_SCHEMA') }}.fct_jobs(job_id),
+    location_id INTEGER REFERENCES {{ env_var('POSTGRES_SILVER_SCHEMA') }}.dim_location(location_id) ON DELETE CASCADE,
+    date DATE,
+    nb_applicants INTEGER,
+    nb_views INTEGER,
+    days_since_published INTEGER,
+    PRIMARY KEY (job_id, location_id, date)
 );

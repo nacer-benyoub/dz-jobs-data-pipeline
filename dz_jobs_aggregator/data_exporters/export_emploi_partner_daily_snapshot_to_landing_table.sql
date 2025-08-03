@@ -30,7 +30,7 @@ SELECT
     job_source
 
 FROM {{ df_1 }}
-ON CONFLICT(job_id, date_scraped)
+ON CONFLICT(job_id, country, region, state, city, date_scraped)
 DO UPDATE SET
     positions = EXCLUDED.positions,
     expire_date = EXCLUDED.expire_date,

@@ -1,5 +1,6 @@
 -- Docs: https://docs.mage.ai/guides/sql-blocks
 -- Create temp table
+DROP TABLE IF EXISTS temp_daily_snapshot_emploitic;
 CREATE TEMP TABLE temp_daily_snapshot_emploitic AS
 WITH unnested AS (
     SELECT
@@ -181,8 +182,7 @@ ON CONFLICT
 
 -- Fact table
 INSERT INTO {{ env_var("POSTGRES_SILVER_SCHEMA") }}.fct_jobs (job_id, title, company_id, sector_id, m_positions, datetime_published, is_anonymous, work_mode, has_salary, job_source, date_scraped)
-SELECT DISTINCT
-    t.job_id,
+SELECT DISTINCT ON (t.job_id) t.job_id,
     t.title,
     c.company_id,
     s.sector_id,
@@ -199,6 +199,7 @@ FROM
 	ON t.company = c.company_name
     JOIN {{ env_var("POSTGRES_SILVER_SCHEMA") }}.dim_sector s
 	ON t.sector = s.sector_description
+ORDER BY t.job_id
 ON CONFLICT (job_id)
     DO UPDATE SET
         company_id = EXCLUDED.company_id,

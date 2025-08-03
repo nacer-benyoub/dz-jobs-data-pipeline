@@ -30,6 +30,19 @@ def transform(data: pd.DataFrame, *args, **kwargs):
         Anything (e.g. data frame, dictionary, array, int, str, etc.)
     """
 
+    # drop exact duplicates
+    # Select only hashable columns for drop_duplicates
+    hashable_cols = [
+        col
+        for col in data.columns
+        if pd.api.types.is_hashable(data[col].dropna().iloc[0])
+    ]
+    duplicates_mask = data.duplicated(subset=hashable_cols)
+    print(f"Shape before deduplication: {data.shape}")
+    print(f"Exact duplicates: {duplicates_mask.sum()}")
+    data = data[~duplicates_mask]
+    print(f"Shape after deduplication: {data.shape}")
+    
     # create job_id surrogate key
     data = create_job_id_pkey(data)
 
@@ -178,12 +191,6 @@ def transform(data: pd.DataFrame, *args, **kwargs):
 
     print(data.dtypes)
     return data
-    # return data[~(
-    #     data["education_level_in_fr"] &
-    #     data["experience_years_in_fr"] &
-    #     data["function_in_fr"] &
-    #     data["job_level_in_fr"]
-    # )]
 
 
 @test

@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from typing import Iterable
 import pandas as pd
 from pandas import DataFrame
 from hashlib import md5
@@ -211,13 +211,20 @@ def handle_dtypes(df: DataFrame) -> DataFrame:
     return typed_df
 
 
-def create_job_id_pkey(df: DataFrame) -> DataFrame:
-    """Create a job_id column using md5 hash of the title, company and datetime_published columns"""
-    df["combined_pkey"] = (
-        df["title"].fillna("")
-        + df["company"].fillna("")
-        + df["datetime_published"].astype(str).fillna("")
+def create_job_id_pkey(df: DataFrame, cols: Iterable[str]=None) -> DataFrame:
+    """Create a job_id column using md5 hash of the title, company and datetime_published columns and any other columns specified in `cols`."""
+    default_cols = ["title", "company", "datetime_published"]
+    if cols is not None:
+        for col in cols:
+            if col not in df.columns:
+                raise KeyError(f"{col} is not a column in the input DataFrame")
+        default_cols.extend(cols)
+    # create a combined primary key column
+    df.loc[:, "combined_pkey"] = df[default_cols].astype(str).fillna("").agg(
+        lambda x: "".join(x), axis=1
     )
+    # generate a job_id using md5 hash of the combined_pkey
+    # and the first word of the title in lowercase
     generate_id = lambda x: md5(x.encode()).hexdigest()
     df["job_id"] = (
         df["title"].str.split(" ").str.get(0).str.lower()

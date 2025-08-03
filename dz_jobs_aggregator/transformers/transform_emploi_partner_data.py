@@ -30,11 +30,38 @@ def transform(data, *args, **kwargs):
     Returns:
         Anything (e.g. data frame, dictionary, array, int, str, etc.)
     """
-    # create job_id surrogate key
-    data = create_job_id_pkey(data)
+    # drop exact duplicates
+    # Select only hashable columns for drop_duplicates
+    hashable_cols = [
+        col
+        for col in data.columns
+        if pd.api.types.is_hashable(data[col].dropna().iloc[0])
+    ]
+    duplicates_mask = data.duplicated(subset=hashable_cols)
+    print(f"Shape before deduplication: {data.shape}")
+    print(f"Exact duplicates: {duplicates_mask.sum()}")
+    data = data[~duplicates_mask]
+    print(f"Shape after deduplication: {data.shape}")
 
-    # drop_duplicates
-    data = data.drop_duplicates("job_id")
+    # create job_id surrogate key
+    data = create_job_id_pkey(data, ["sector_id"])
+
+    # merge rows with same job_id but different properties
+    group_by_cols = ["job_id", "country", "region", "state", "city"]
+    agg_cols = [col for col in data.columns if col not in group_by_cols]
+    agg_dict = {col: "first" for col in agg_cols}
+    # Add a temporary column to count duplicates
+    data["_dup_count"] = 1
+    for col in ["_dup_count", "nb_views", "nb_applicants"]:
+        agg_dict[col] = "sum"
+    data = data.groupby(group_by_cols, as_index=False, dropna=False).agg(agg_dict)
+    duplicate_group_count = (data["_dup_count"] > 1).sum()
+    total_duplicate_count = data[data["_dup_count"] > 1]["_dup_count"].sum()
+    duplicates = total_duplicate_count - duplicate_group_count
+    print(f"Merged duplicates: {duplicates}")
+    print(f"Shape after merge deduplication: {data.shape}")
+    # drop the temporary column
+    data = data.drop(columns=["_dup_count"])
 
     # replace ids with names for experience_years_id, sector_id and function_id
     # merge experience_years
@@ -157,6 +184,7 @@ def test_output(output, *args) -> None:
     """
     Template code for testing the output of the block.
     """
+    assert output.duplicated(["job_id", "country", "region", "state", "city"]).sum() == 0, "output has duplicates"
     assert "datetime" in str(
         output.datetime_published.dtype
     ), f"datetime_published is not of type `datetime`. Got `{output.datetime_published.dtype}` instead"
@@ -166,4 +194,3 @@ def test_output(output, *args) -> None:
     assert "datetime" in str(
         output.date_scraped.dtype
     ), f"date_scraped is not of type `datetime`. Got `{output.date_scraped.dtype}` instead"
-    assert output.duplicated("job_id").sum() == 0, "output has duplicates"

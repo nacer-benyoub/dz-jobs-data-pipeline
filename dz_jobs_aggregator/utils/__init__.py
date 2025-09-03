@@ -106,7 +106,7 @@ def parse_emploitic_json(raw_json: str) -> list:
 
             # get the whole object because we need the `label`, 'id' and 'lang' values
             raw_field_obj = job_criteria[camelcase_field]
-            if field in ["location", "contract_type"]:
+            if field == "contract_type":
                 job_item[field] = (
                     [field_value["label"] for field_value in raw_field_obj]
                     if raw_field_obj
@@ -211,7 +211,7 @@ def handle_dtypes(df: DataFrame) -> DataFrame:
     return typed_df
 
 
-def create_job_id_pkey(df: DataFrame, cols: Iterable[str]=None) -> DataFrame:
+def create_job_id_pkey(df: DataFrame, cols: Iterable[str] = None) -> DataFrame:
     """Create a job_id column using md5 hash of the title, company and datetime_published columns and any other columns specified in `cols`."""
     default_cols = ["title", "company", "datetime_published"]
     if cols is not None:
@@ -241,9 +241,9 @@ def replace_attribute_ids_with_values(
     attribute_url: str,
     json_results_key: str,
     df_join_key: str,
-    attribute_join_key: str,
     attribute_source_name: str,
     attribute_final_name: str,
+    attribute_join_key: str = None,
     values_lang: str = "fr",
     join_method="left",
 ) -> DataFrame:
@@ -253,7 +253,7 @@ def replace_attribute_ids_with_values(
     Args:
         df (DataFrame): original dataframe
         attribute_url (str): url to fetch attribute data
-        json_results_key (str): key under which is mapping of attribute ids and values in response json
+        json_results_key (str): key under which is the mapping of attribute ids and values in response json, If no value is supplied, the mapping is assumed to be the non-nested first level objects
         df_join_key (str): attribute join key in original dataframe
         attribute_join_key (str): attribute join key in attribute dataframe
         attribute_source_name (str): attribute name in attribute dataframe
@@ -266,10 +266,12 @@ def replace_attribute_ids_with_values(
     """
     params = {"lang": values_lang}
     headers = {"Accept-Language": values_lang}
-    cleaned_url = re.sub("&lang=[^&]+", "", attribute_url).rstrip("?")
+    cleaned_url = re.sub("&?lang=[^&]+", "", attribute_url).rstrip("?")
     attribute_json_data = requests.get(
         url=cleaned_url, params=params, headers=headers
-    ).json()[json_results_key]
+    ).json()
+    if json_results_key:
+        attribute_json_data = attribute_json_data[json_results_key]
     attribute_df = DataFrame(attribute_json_data).convert_dtypes()
     merged_df = df.merge(
         right=attribute_df[[attribute_join_key, attribute_source_name]],

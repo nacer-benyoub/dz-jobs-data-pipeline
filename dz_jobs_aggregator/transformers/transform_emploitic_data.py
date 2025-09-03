@@ -50,7 +50,7 @@ def transform(data: pd.DataFrame, *args, **kwargs):
     data = data.drop_duplicates("job_id")
 
     # add date_scraped column
-    data["date_scraped"] = kwargs.get('execution_date').date()
+    data["date_scraped"] = kwargs.get("execution_date").date()
 
     # convert dtypes
     data = handle_dtypes(data)
@@ -59,6 +59,7 @@ def transform(data: pd.DataFrame, *args, **kwargs):
     # change "sector" type to list[dict] to apply this step
     data["sector"] = data["sector"].apply(lambda dict_: [dict_])
     attribute_urls = {
+        "location": "https://emploitic.com/api/v4/lists/locations?per_page=10000",
         "education_level": "https://emploitic.com/api/v4/lists/niveau-de-formation",
         "experience_years": "https://emploitic.com/api/v4/lists/annees-dexperience",
         "function": "https://emploitic.com/api/v4/lists/metiers",

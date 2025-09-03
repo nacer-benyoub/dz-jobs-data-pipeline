@@ -60,8 +60,9 @@ def load_data_from_api(*args, **kwargs):
     response = requests.get(BASE_URL, params=params)
     response_json = response.json()
     print(f"jobs to fetch: {response_json['pagination']['total']}")
-    print(response.url)
     total_pages = response_json["pagination"]["totalPages"]
+    print(f"total pages: {total_pages}")
+    print(response.url)
     jobs = parse_emploitic_json(response_json)
     if total_pages > 1:
         for page in range(2, total_pages + 1):

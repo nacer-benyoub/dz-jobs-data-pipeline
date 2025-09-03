@@ -1,17 +1,17 @@
 triggers:
 - description: null
   envs: []
-  last_enabled_at: 2025-05-21 19:44:41.456833
+  last_enabled_at: 2025-05-21 19:44:41.456833+00:00
   name: api trigger
   pipeline_uuid: dz_jobs_pipeline
   schedule_interval: null
   schedule_type: api
   settings:
     allow_blocks_to_fail: false
-    timeout: '600'
+    timeout: ''
     timeout_status: failed
   sla: 300
-  start_time: 2025-05-21 19:42:00
+  start_time: 2025-05-21 19:42:00+00:00
   status: active
   token: 4f2159a3b8fc41148d602aa052b88e5f
   variables:

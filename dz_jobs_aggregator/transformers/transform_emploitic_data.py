@@ -42,7 +42,7 @@ def transform(data: pd.DataFrame, *args, **kwargs):
     print(f"Exact duplicates: {duplicates_mask.sum()}")
     data = data[~duplicates_mask]
     print(f"Shape after deduplication: {data.shape}")
-    
+
     # create job_id surrogate key
     data = create_job_id_pkey(data)
 
@@ -75,21 +75,39 @@ def transform(data: pd.DataFrame, *args, **kwargs):
                 else True
             )
         )
+        print(f'(~data["{attribute}_in_fr"]).sum()', (~data[f"{attribute}_in_fr"]).sum())
+        # if no standardization needed, extract the labels and continue to next attribute
+        if (~data[f"{attribute}_in_fr"]).sum() == 0:
+            exploded_attribute = data[["job_id", attribute]].explode(attribute)
+            exploded_attribute[["id", "label", "lang"]] = exploded_attribute[attribute].apply(pd.Series)
+            data[attribute] = exploded_attribute.groupby("job_id", sort=False).agg({"label": lambda l: l.tolist()})["label"].values
+            continue
 
         # get value IDs in rows with mixed-language values
+        # df_attribute_not_in_fr = data.loc[
+        #     ~data[f"{attribute}_in_fr"], ["job_id", attribute]
+        # ].copy()
         df_attribute_not_in_fr = data.loc[
             ~data[f"{attribute}_in_fr"], ["job_id", attribute]
-        ].copy()
-        df_attribute_not_in_fr[f"{attribute}_id_not_fr"] = df_attribute_not_in_fr[
+        ].explode(attribute)
+        # df_attribute_not_in_fr[f"{attribute}_id_not_fr"] = df_attribute_not_in_fr[
+        #     attribute
+        # ].apply(
+        #     lambda dict_list: (
+        #         [dict_.get("id") for dict_ in dict_list] if dict_list else None
+        #     )
+        # )
+        attribute_col_names = [
+            f"{attribute}_id_not_fr",
+            f"{attribute}_label_not_fr",
+            f"{attribute}_lang_not_fr",
+        ]
+        df_attribute_not_in_fr[attribute_col_names] = df_attribute_not_in_fr[
             attribute
-        ].apply(
-            lambda dict_list: (
-                [dict_.get("id") for dict_ in dict_list] if dict_list else None
-            )
-        )
-        df_attribute_not_in_fr = df_attribute_not_in_fr.explode(
-            f"{attribute}_id_not_fr"
-        )
+        ].apply(pd.Series)
+        # df_attribute_not_in_fr = df_attribute_not_in_fr.explode(
+        #     f"{attribute}_id_not_fr"
+        # )
         # replace the IDs with their respective values in the desired language using the attribute API endpoint
         attribute_url = attribute_urls[attribute]
         df_attribute_not_in_fr = replace_attribute_ids_with_values(
@@ -100,6 +118,7 @@ def transform(data: pd.DataFrame, *args, **kwargs):
             attribute_join_key="id",
             attribute_source_name="label",
             attribute_final_name=f"{attribute}_tr",
+            api_json_page_size=10000 if attribute == "location" else 1000,
         )
         # array_agg back the values after exploding them
         df_attribute_not_in_fr = df_attribute_not_in_fr.groupby(

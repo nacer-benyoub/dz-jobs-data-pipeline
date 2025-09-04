@@ -220,8 +220,8 @@ def create_job_id_pkey(df: DataFrame, cols: Iterable[str] = None) -> DataFrame:
                 raise KeyError(f"{col} is not a column in the input DataFrame")
         default_cols.extend(cols)
     # create a combined primary key column
-    df.loc[:, "combined_pkey"] = df[default_cols].astype(str).fillna("").agg(
-        lambda x: "".join(x), axis=1
+    df.loc[:, "combined_pkey"] = (
+        df[default_cols].astype(str).fillna("").agg(lambda x: "".join(x), axis=1)
     )
     # generate a job_id using md5 hash of the combined_pkey
     # and the first word of the title in lowercase
@@ -239,12 +239,14 @@ def create_job_id_pkey(df: DataFrame, cols: Iterable[str] = None) -> DataFrame:
 def replace_attribute_ids_with_values(
     df: DataFrame,
     attribute_url: str,
-    json_results_key: str,
     df_join_key: str,
     attribute_source_name: str,
     attribute_final_name: str,
-    attribute_join_key: str = None,
+    attribute_join_key: str,
+    json_results_key: str = None,
     values_lang: str = "fr",
+    api_json_page_size: int = 1000,
+    params: dict = {},
     join_method="left",
 ) -> DataFrame:
     """Fetch attribute values from its url and join with df
@@ -258,18 +260,18 @@ def replace_attribute_ids_with_values(
         attribute_join_key (str): attribute join key in attribute dataframe
         attribute_source_name (str): attribute name in attribute dataframe
         attribute_final_name (str): attribute name in final dataframe
-        values_lang (str): prefered language for attribute values. To be passed as url `lang` query parameter. Defaults to "fr"
+        values_lang (str): prefered language for attribute values. To be passed as `lang` url query parameter. Defaults to "fr"
+        api_json_page_size (int): number of results returned from url call. To be passed as `per_page` url query parameter. Defaults to 1000,
+        params (dict): additional url query parameters. Defaults to empty dict.,
         join_method (str, optional): original and attribute dataframe join method. Defaults to "left".
 
     Returns:
         DataFrame: final dataframe with attribute keys replaced by their respective values
     """
-    params = {"lang": values_lang}
+    params = params | {"lang": values_lang, "per_page": api_json_page_size}
     headers = {"Accept-Language": values_lang}
-    cleaned_url = re.sub("&?lang=[^&]+", "", attribute_url).rstrip("?")
-    attribute_json_data = requests.get(
-        url=cleaned_url, params=params, headers=headers
-    ).json()
+    response = requests.get(url=attribute_url, params=params, headers=headers)
+    attribute_json_data = response.json()
     if json_results_key:
         attribute_json_data = attribute_json_data[json_results_key]
     attribute_df = DataFrame(attribute_json_data).convert_dtypes()

@@ -1,15 +1,17 @@
 services:
-  magic:
+  mage:
     image: mageai/mageai:latest
     container_name: ${MAGE_CONTAINER_NAME}
     command: mage start ${PROJECT_NAME}
     env_file:
       - dw.env
     ports:
-      - 6789:6789
+      - "6795:6789"
     volumes:
       - .:/home/src/
     restart: on-failure:5
+    depends_on:
+      - postgres
 
   postgres:
     image: postgres:17

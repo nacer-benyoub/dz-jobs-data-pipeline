@@ -77,6 +77,89 @@ To deploy this pipeline using Neon and Github Actions, do the following:
 - Standardizing columns coming from the two sources in different formats and languages.
 - Handling a string encoding issue (`é` -> `u00e9`, `ï` -> `u00ef`) caused by Mage when loading `text[]` columns into Postgres, which taught me about the `unistr` function in Postgres. I have submitted an [issue](https://github.com/mage-ai/mage-ai/issues/5803) and a [PR](https://github.com/mage-ai/mage-ai/pull/5808) in the Mage GitHub repo for this.
 
+## ⬇️ Data Dump Usage
+
+You can load the dataset either **with Docker** (recommended for quick setup) or **locally** (if PostgreSQL is already installed).
+
+---
+
+### 🐳 - Using Docker
+
+1. **Download** the data dump from the [Releases page](https://github.com/nacer-benyoub/dz-jobs-data-pipeline/releases).
+
+2. **Move** it to a directory called `data_dump`:
+   ```bash
+   mkdir data_dump && mv jobs_data_jun_oct_2025.bak data_dump/
+   ```
+
+3. **Spin up** a PostgreSQL container  
+   *(replace the password placeholder below)*:
+   ```bash
+   docker run --name postgres \
+    -e POSTGRES_PASSWORD=<your-password> \
+    -v "dz-job-postgres-data:/var/lib/postgresql/data" \
+    -v "$(pwd)/data_dump:/home" \
+    -p 5432:5432 \
+    -d \
+    postgres
+   ```
+
+4. **Restore** the dump into the running container:
+   ```bash
+   docker exec postgres pg_restore \
+   -U postgres \
+   -d postgres \
+   -OCxv home/jobs_data_jun_oct_2025.bak
+   ```
+
+---
+
+### 💻 - Using Local PostgreSQL
+
+If you already have PostgreSQL installed locally:
+
+1. **Download** the data dump from the [Releases page](https://github.com/nacer-benyoub/dz-jobs-data-pipeline/releases).
+
+2. **Create a database** (optional, `pg_restore` can also create it automatically):
+   ```bash
+   createdb warehouse
+   ```
+
+3. **Restore** the dump:
+   ```bash
+   pg_restore -U postgres -d warehouse -OCxv jobs_data_jun_oct_2025.bak
+   ```
+   > 💡 You may need to add `-h localhost -p 5432` if your setup requires it.
+
+4. **Verify** the data is loaded:
+   ```bash
+   psql -U postgres -d warehouse -c "\dn"
+   ```
+
+---
+
+### 🧭 Connection Info
+
+Once restored, the data is accessible via any PostgreSQL client:
+
+| Parameter | Value |
+|------------|--------|
+| **Host** | `localhost` |
+| **Port** | `5432` |
+| **User** | `postgres` |
+| **Password** | `<your-password>` (set above) |
+| **Database** | `warehouse` |
+
+---
+
+### 📂 Contents
+
+- **`silver` schema** → Tables with processed data in a star schema (facts, bridges, and dimensions).  
+- **`gold` schema** →  
+  - Views (`vw_job_<dim>`) acting as shortcut joins between each dimension and its bridge table.  
+  - Materialized views (`mv_...`) containing pre-aggregated metrics.
+
+
 ## ⏩ Future work
 - Add more data sources.
 - Use Spark, Iceberg, and Minio to implement a lakehouse architecture and account for distributed compute and storage to scale properly.
